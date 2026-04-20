@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kiln Segment Viewer</title>
+  <style>
+    :root {
+      --bg: #f4f1ea;
+      --panel: #fffdf8;
+      --ink: #2e2a26;
+      --muted: #6b6259;
+      --line: #c9b9a6;
+      --accent: #8a4b2a;
+      --accent2: #c98052;
+      --danger: #8b2d2d;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    .wrap {
+      width: 100%;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 28px;
+      text-align: left;
+    }
+
+    .sub {
+      color: var(--muted);
+      margin-bottom: 18px;
+      text-align: left;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    .panel h2 {
+      margin: 0 0 12px 0;
+      font-size: 20px;
+      text-align: left;
+    }
+
+    .field {
+      display: block;
+      width: 100%;
+      margin: 0 0 14px 0;
+      padding: 0;
+      text-align: left;
+    }
+
+    label {
+      display: block;
+      width: 100%;
+      margin: 0 0 6px 0;
+      font-weight: bold;
+      text-align: left;
+    }
+
+    input {
+      display: block;
+      width: 100%;
+      margin: 0;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid #b8ab9d;
+      background: #fff;
+      font-size: 14px;
+      text-align: left;
+    }
+
+    .hint {
+      margin-top: 4px;
+      font-size: 12px;
+      line-height: 1.35;
+      color: var(--muted);
+      text-align: left;
+    }
+
+    .buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px 14px;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .primary { background: var(--accent); color: #fff; }
+    .secondary { background: #e8ddd0; color: var(--ink); }
+    .danger { background: #f3d7d7; color: var(--danger); }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(120px, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .stat {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .stat .label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .stat .value {
+      font-size: 22px;
+      font-weight: bold;
+    }
+
+    .chartBox {
+      position: relative;
+      width: 100%;
+      height: 460px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .note {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.45;
+      text-align: left;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      margin-top: 10px;
+    }
+
+    th, td {
+      border: 1px solid #d7cabd;
+      padding: 8px 10px;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th {
+      background: #efe5d8;
+    }
+
+    .empty {
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--muted);
+      text-align: center;
+      padding: 18px;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 920px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .chartBox {
+        height: 360px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Kiln Segment Viewer</h1>
+    <div class="sub">
+      Enter each segment by target temperature, rate in °F/hour, and hold/soak time. The profile graph and segment table update as you go.
+    </div>
+
+    <div class="layout">
+      <div class="panel">
+        <h2>Segment Entry</h2>
+
+        <div class="field">
+          <label for="startTemp">Starting Temperature (°F)</label>
+          <input id="startTemp" type="number" value="70" step="1" />
+          <div class="hint">Segment 1 uses this value. After each segment is added, this updates to the last target temperature.</div>
+        </div>
+
+        <div class="field">
+          <label for="targetTemp">Target Temperature (°F)</label>
+          <input id="targetTemp" type="number" value="0" step="1" />
+        </div>
+
+        <div class="field">
+          <label for="rate">Rate (°F per hour)</label>
+          <input id="rate" type="number" value="0" step="1" min="0" />
+        </div>
+
+        <div class="field">
+          <label for="hold">Hold / Soak Time (minutes)</label>
+          <input id="hold" type="number" value="0" step="1" min="0" />
+        </div>
+
+        <div class="buttons">
+          <button class="primary" id="addBtn">Add Segment</button>
+          <button class="secondary" id="helpBtn">Help</button>
+          <button class="secondary" id="removeBtn">Remove Last Segment</button>
+          <button class="secondary" id="saveBtn">Save Segment Table</button>
+          <button class="danger" id="clearBtn">Clear All</button>
+        </div>
+
+        <div class="summary">
+          <div class="stat">
+            <div class="label">Total Segments</div>
+            <div class="value" id="segmentCount">0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Final Temperature</div>
+            <div class="value" id="finalTemp">--</div>
+          </div>
+          <div class="stat">
+            <div class="label">Total Time</div>
+            <div class="value" id="totalTime">0.0 h</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Program Profile</h2>
+        <div class="chartBox">
+          <canvas id="chartCanvas"></canvas>
+        </div>
+        <div class="note">X-axis = elapsed time in hours. Y-axis = temperature in °F. Horizontal sections are holds/soaks.</div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top: 18px;">
+      <h2>Segment Table</h2>
+      <div id="tableWrap"></div>
+    </div>
+  </div>
+
+  <script>
+    const segments = [];
+
+    const startTempInput = document.getElementById('startTemp');
+    const targetTempInput = document.getElementById('targetTemp');
+
+    // Highlight target temperature on focus
+    targetTempInput.addEventListener('focus', function() {
+      targetTempInput.select();
+    });
+    const rateInput = document.getElementById('rate');
+    const holdInput = document.getElementById('hold');
+
+    const addBtn = document.getElementById('addBtn');
+    const helpBtn = document.getElementById('helpBtn');
+    const removeBtn = document.getElementById('removeBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const clearBtn = document.getElementById('clearBtn');
+
+    const segmentCountEl = document.getElementById('segmentCount');
+    const finalTempEl = document.getElementById('finalTemp');
+    const totalTimeEl = document.getElementById('totalTime');
+    const tableWrap = document.getElementById('tableWrap');
+
+    const canvas = document.getElementById('chartCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function getStartTemperature() {
+      const value = Number(startTempInput.value);
+      return Number.isFinite(value) ? value : 0;
+    }
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function addSegment() {
+      const start = getStartTemperature();
+      const target = Number(targetTempInput.value);
+      const rate = Number(rateInput.value);
+      const hold = Number(holdInput.value);
+
+      if (!Number.isFinite(start)) {
+        alert('Enter a valid starting temperature.');
+        startTempInput.focus();
+        return;
+      }
+      if (!Number.isFinite(target)) {
+        alert('Enter a valid target temperature.');
+        targetTempInput.focus();
+        return;
+      }
+      if (!Number.isFinite(rate) || rate <= 0) {
+        alert('Enter a valid rate greater than 0 °F per hour.');
+        rateInput.focus();
+        return;
+      }
+      if (!Number.isFinite(hold) || hold < 0) {
+        alert('Enter a valid hold/soak time of 0 minutes or more.');
+        holdInput.focus();
+        return;
+      }
+
+      const delta = Math.abs(target - start);
+      const rampHours = delta / rate;
+      const holdHours = hold / 60;
+      const segmentNumber = segments.length + 1;
+
+      segments.push({
+        segment: segmentNumber,
+        start: start,
+        target: target,
+        rate: rate,
+        hold: hold,
+        rampHours: rampHours,
+        holdHours: holdHours,
+        totalHours: rampHours + holdHours
+      });
+
+      startTempInput.value = String(target);
+      targetTempInput.value = '0';
+      rateInput.value = '0';
+      holdInput.value = '0';
+
+      renderAll();
+      targetTempInput.focus();
+      targetTempInput.select();
+    }
+
+    function removeLastSegment() {
+      if (segments.length === 0) {
+        return;
+      }
+
+      segments.pop();
+
+      if (segments.length === 0) {
+        startTempInput.value = '0';
+      } else {
+        startTempInput.value = String(segments[segments.length - 1].target);
+      }
+
+      renderAll();
+      targetTempInput.focus();
+    }
+
+    function clearAll() {
+      segments.length = 0;
+      startTempInput.value = '0';
+      targetTempInput.value = '0';
+      rateInput.value = '0';
+      holdInput.value = '0';
+      renderAll();
+      startTempInput.focus();
+      startTempInput.select();
+    }
+
+    function getProfilePoints() {
+      const points = [];
+      let elapsed = 0;
+      let currentTemp = segments.length > 0 ? segments[0].start : getStartTemperature();
+
+      points.push({ time: elapsed, temp: currentTemp });
+
+      segments.forEach(seg => {
+        elapsed += seg.rampHours;
+        currentTemp = seg.target;
+        points.push({ time: elapsed, temp: currentTemp });
+
+        if (seg.holdHours > 0) {
+          elapsed += seg.holdHours;
+          points.push({ time: elapsed, temp: currentTemp });
+        }
+      });
+
+      return points;
+    }
+
+    function drawChart() {
+      resizeCanvas();
+
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      ctx.clearRect(0, 0, w, h);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+
+      const pad = { left: 70, right: 25, top: 20, bottom: 50 };
+      const plotW = w - pad.left - pad.right;
+      const plotH = h - pad.top - pad.bottom;
+
+      const points = getProfilePoints();
+      const times = points.map(p => p.time);
+      const temps = points.map(p => p.temp);
+
+      const maxTime = Math.max(...times, 1);
+      const minTemp = Math.min(...temps, 0);
+      const maxTemp = Math.max(...temps, 100);
+      const tempPad = Math.max(25, (maxTemp - minTemp) * 0.08);
+      const yMin = Math.max(0, minTemp - tempPad);
+      const yMax = maxTemp + tempPad;
+
+      const xScale = (time) => pad.left + (time / maxTime) * plotW;
+      const yScale = (temp) => pad.top + (1 - ((temp - yMin) / (yMax - yMin || 1))) * plotH;
+
+      ctx.strokeStyle = '#e2d6c9';
+      ctx.lineWidth = 1;
+      ctx.fillStyle = '#6b6259';
+      ctx.font = '12px Arial';
+
+      const yTicks = 6;
+      for (let i = 0; i <= yTicks; i++) {
+        const value = yMin + (i / yTicks) * (yMax - yMin);
+        const y = yScale(value);
+        ctx.beginPath();
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(w - pad.right, y);
+        ctx.stroke();
+        ctx.fillText(Math.round(value) + '°', 10, y + 4);
+      }
+
+      const xTicks = 8;
+      for (let i = 0; i <= xTicks; i++) {
+        const value = (i / xTicks) * maxTime;
+        const x = xScale(value);
+        ctx.beginPath();
+        ctx.moveTo(x, pad.top);
+        ctx.lineTo(x, h - pad.bottom);
+        ctx.stroke();
+        ctx.fillText(value.toFixed(1) + ' h', x - 14, h - 18);
+      }
+
+      ctx.strokeStyle = '#8c8176';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(pad.left, pad.top);
+      ctx.lineTo(pad.left, h - pad.bottom);
+      ctx.lineTo(w - pad.right, h - pad.bottom);
+      ctx.stroke();
+
+      if (points.length >= 2) {
+        ctx.strokeStyle = '#7b3f22';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        points.forEach((point, index) => {
+          const x = xScale(point.time);
+          const y = yScale(point.temp);
+          if (index === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+
+        ctx.fillStyle = '#c98052';
+        points.forEach(point => {
+          const x = xScale(point.time);
+          const y = yScale(point.temp);
+          ctx.beginPath();
+          ctx.arc(x, y, 4, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        ctx.fillStyle = '#2e2a26';
+        ctx.font = 'bold 12px Arial';
+        let pointIndex = 1;
+        segments.forEach(seg => {
+          if (points[pointIndex]) {
+            const x = xScale(points[pointIndex].time);
+            const y = yScale(points[pointIndex].temp);
+            ctx.fillText('S' + seg.segment, x + 6, y - 8);
+            pointIndex += seg.holdHours > 0 ? 2 : 1;
+          }
+        });
+      }
+
+      ctx.save();
+      ctx.translate(18, h / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillStyle = '#2e2a26';
+      ctx.font = 'bold 13px Arial';
+      ctx.fillText('Temperature (°F)', 0, 0);
+      ctx.restore();
+
+      ctx.fillStyle = '#2e2a26';
+      ctx.font = 'bold 13px Arial';
+      ctx.fillText('Elapsed Time (hours)', w / 2 - 55, h - 8);
+    }
+
+    function renderSummary() {
+      const totalSegments = segments.length;
+      const totalHours = segments.reduce((sum, seg) => sum + seg.totalHours, 0);
+      const finalTemp = totalSegments > 0 ? segments[totalSegments - 1].target + '°' : '--';
+
+      segmentCountEl.textContent = String(totalSegments);
+      finalTempEl.textContent = finalTemp;
+      totalTimeEl.textContent = totalHours.toFixed(1) + ' h';
+    }
+
+    function renderTable() {
+      if (segments.length === 0) {
+        tableWrap.innerHTML = '<div class="empty">No segments entered yet.</div>';
+        return;
+      }
+
+      let html = '';
+      html += '<table>';
+      html += '<thead><tr>';
+      html += '<th>Segment</th>';
+      html += '<th>Start (°F)</th>';
+      html += '<th>Target (°F)</th>';
+      html += '<th>Rate (°F/hr)</th>';
+      html += '<th>Ramp Time (hr)</th>';
+      html += '<th>Hold (min)</th>';
+      html += '<th>Segment Total (hr)</th>';
+      html += '</tr></thead><tbody>';
+
+      segments.forEach(seg => {
+        html += '<tr>';
+        html += '<td>' + seg.segment + '</td>';
+        html += '<td>' + seg.start + '</td>';
+        html += '<td>' + seg.target + '</td>';
+        html += '<td>' + seg.rate + '</td>';
+        html += '<td>' + seg.rampHours.toFixed(2) + '</td>';
+        html += '<td>' + seg.hold + '</td>';
+        html += '<td>' + seg.totalHours.toFixed(2) + '</td>';
+        html += '</tr>';
+      });
+
+      html += '</tbody></table>';
+      tableWrap.innerHTML = html;
+    }
+
+    function buildSegmentTableText() {
+      const lines = [];
+      const totalHours = segments.reduce((sum, seg) => sum + seg.totalHours, 0);
+      const finalTemp = segments.length > 0 ? segments[segments.length - 1].target + ' °F' : '--';
+
+      lines.push('KILN SEGMENT LIST');
+      lines.push('');
+      lines.push('Total Segments: ' + segments.length);
+      lines.push('Starting Temperature: ' + getStartTemperature() + ' °F');
+      lines.push('Final Temperature: ' + finalTemp);
+      lines.push('Total Time: ' + totalHours.toFixed(2) + ' hours');
+      lines.push('');
+
+      const widths = [8, 12, 14, 16, 18, 12, 20];
+      const pad = (txt, w) => String(txt).padEnd(w, ' ');
+
+      const header = [
+        pad('Segment', widths[0]),
+        pad('Start (°F)', widths[1]),
+        pad('Target (°F)', widths[2]),
+        pad('Rate (°F/hr)', widths[3]),
+        pad('Ramp Time (hr)', widths[4]),
+        pad('Hold (min)', widths[5]),
+        pad('Segment Total (hr)', widths[6])
+      ].join('');
+
+      lines.push(header);
+      lines.push('-'.repeat(header.length));
+
+      if (segments.length === 0) {
+        lines.push('No segments entered.');
+      } else {
+        segments.forEach(seg => {
+          const row = [
+            pad(seg.segment, widths[0]),
+            pad(seg.start, widths[1]),
+            pad(seg.target, widths[2]),
+            pad(seg.rate, widths[3]),
+            pad(seg.rampHours.toFixed(2), widths[4]),
+            pad(seg.hold, widths[5]),
+            pad(seg.totalHours.toFixed(2), widths[6])
+          ].join('');
+          lines.push(row);
+        });
+      }
+
+      return lines.join('\n');
+    }
+
+    function saveSegmentTable() {
+      const text = buildSegmentTableText();
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'View segment table.txt';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    function openHelp() {
+      window.open('README.txt', '_blank');
+    }
+
+    function renderAll() {
+      renderSummary();
+      renderTable();
+      drawChart();
+    }
+
+    addBtn.addEventListener('click', addSegment);
+    helpBtn.addEventListener('click', openHelp);
+    removeBtn.addEventListener('click', removeLastSegment);
+    saveBtn.addEventListener('click', saveSegmentTable);
+    clearBtn.addEventListener('click', clearAll);
+
+    [targetTempInput, rateInput, holdInput].forEach(input => {
+      input.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+          addSegment();
+        }
+      });
+    });
+
+    startTempInput.addEventListener('change', renderAll);
+    window.addEventListener('resize', drawChart);
+
+    renderAll();
+  </script>
+</body>
+</html>
